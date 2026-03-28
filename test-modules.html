@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ブラウザテスト - Altair Module Status</title>
+<style>
+  body { font-family: monospace; padding: 20px; background: #0d1117; color: #fff; }
+  h1 { color: #99d8ff; }
+  .success { color: #3aaa72; }
+  .error { color: #e24b4a; }
+  .pending { color: #e09030; }
+  pre { background: #161b22; padding: 10px; border-radius: 4px; overflow: auto; }
+</style>
+</head>
+<body>
+<h1>📋 Altair Module Load Test</h1>
+
+<h2>Global State Check:</h2>
+<pre id="status"></pre>
+
+<h2>Error Log:</h2>
+<pre id="errors"></pre>
+
+<script>
+const status = document.getElementById('status');
+const errors = document.getElementById('errors');
+
+let result = '';
+let errorLog = [];
+
+// Capture errors
+window.addEventListener('error', (e) => {
+  errorLog.push(`[ERROR] ${e.message} at ${e.filename}:${e.lineno}`);
+});
+
+// Check if index.html content exists
+result += 'Checking DOM elements...\n';
+const app = document.getElementById('app');
+result += app ? `✓ #app element exists\n` : `✗ #app element missing\n`;
+
+const tabBar = document.getElementById('tab-bar');
+result += tabBar ? `✓ #tab-bar exists\n` : `✗ #tab-bar missing\n`;
+
+result += '\nChecking Global Variables (after page load)...\n';
+result += `typeof window.S: ${typeof window.S}\n`;
+result += `typeof window.CFG: ${typeof window.CFG}\n`;
+result += `typeof window.init: ${typeof window.init}\n`;
+result += `typeof window.navigateTo: ${typeof window.navigateTo}\n`;
+
+// Display results
+status.textContent = result;
+
+if (errorLog.length > 0) {
+  errors.textContent = errorLog.join('\n');
+} else {
+  errors.textContent = 'No errors captured yet.';
+}
+
+// Log every 2 seconds
+setInterval(() => {
+  let check = `[${new Date().toLocaleTimeString()}]\n`;
+  check += `S: ${typeof window.S === 'object' ? 'OK' : 'missing'}\n`;
+  check += `CFG: ${typeof window.CFG === 'object' ? 'OK' : 'missing'}\n`;
+  check += `init: ${typeof window.init === 'function' ? 'OK' : 'missing'}\n`;
+  
+  status.textContent = result + '\n' + check;
+}, 2000);
+</script>
+
+<hr>
+<p>このページをブラウザで開いて、モジュールの読み込み状態を確認してください</p>
+</body>
+</html>
