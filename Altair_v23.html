@@ -1,0 +1,2162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,minimum-scale=1,maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Altair">
+<meta name="theme-color" content="#0d1117">
+<link rel="apple-touch-icon" id="altair-icon" href="">
+<script id="altair-icon-gen">(function(){
+function drawAltairIcon(canvas,scale){
+  var S=canvas.width,ctx=canvas.getContext('2d'),cx=S/2,cy=S/2,r=S*0.21;
+  ctx.fillStyle='#0d1117';ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(S-r,0);ctx.arcTo(S,0,S,r,r);ctx.lineTo(S,S-r);ctx.arcTo(S,S,S-r,S,r);ctx.lineTo(r,S);ctx.arcTo(0,S,0,S-r,r);ctx.lineTo(0,r);ctx.arcTo(0,0,r,0,r);ctx.closePath();ctx.fill();
+  ctx.save();ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(S-r,0);ctx.arcTo(S,0,S,r,r);ctx.lineTo(S,S-r);ctx.arcTo(S,S,S-r,S,r);ctx.lineTo(r,S);ctx.arcTo(0,S,0,S-r,r);ctx.lineTo(0,r);ctx.arcTo(0,0,r,0,r);ctx.closePath();ctx.clip();
+  var ratio=S/160;ctx.translate(cx,cy);ctx.scale(scale*ratio,scale*ratio);ctx.translate(-80,-80);
+  var pts=[[80,12],[108,52],[148,80],[108,108],[80,148],[52,108],[12,80],[52,52]];
+  function ds(ss,lw,alpha){ctx.globalAlpha=alpha;ctx.strokeStyle=ss;ctx.lineWidth=lw;ctx.lineJoin='miter';ctx.miterLimit=10;ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);for(var i=1;i<pts.length;i++)ctx.lineTo(pts[i][0],pts[i][1]);ctx.closePath();ctx.stroke();}
+  var g=ctx.createLinearGradient(12,12,148,148);g.addColorStop(0,'#d8f2ff');g.addColorStop(0.32,'#3a9ade');g.addColorStop(0.62,'#1a5fa8');g.addColorStop(1,'#5ab8f0');ds(g,20,1);
+  var gs=ctx.createLinearGradient(148,148,60,60);gs.addColorStop(0,'rgba(0,16,48,0.3)');gs.addColorStop(1,'rgba(0,16,48,0)');ds(gs,20,1);ds('#fff',5,0.18);ds('#d8f2ff',1.5,0.4);ctx.restore();
+}
+var c=document.createElement('canvas');c.width=180;c.height=180;drawAltairIcon(c,0.75);
+var png=c.toDataURL('image/png');document.getElementById('altair-icon').href=png;
+['57','72','76','114','120','144','152','180'].forEach(function(sz){var l=document.createElement('link');l.rel='apple-touch-icon';l.setAttribute('sizes',sz+'x'+sz);l.href=png;document.head.appendChild(l);});
+})();</script>
+<title>Altair</title>
+<style>
+/* style.css — Altair v2.1 */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base:       #0d1117;
+  --bg-card:       #161b22;
+  --bg-border:     #21262d;
+  --text-primary:  #ffffff;
+  --text-secondary:#c9d1d9;
+  --text-muted:    #8b949e;
+  --accent-strong: #99d8ff;
+  --accent-soft:   #76c0ea;
+  --accent-border: rgba(153,216,255,0.25);
+  --accent-bg:     rgba(153,216,255,0.08);
+  --ok:   #3aaa72;
+  --warn: #e09030;
+  --bad:  #e24b4a;
+  --tab-h: 60px;
+  /* iOS PWA: ステータスバー・ホームインジケーター分の安全領域 */
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* iOS PWA では html/body を 100% にするとステータスバー分ずれるため
+   dvh（dynamic viewport height）を使用。未対応ブラウザは 100% にフォールバック */
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ============================================================
+   LAYOUT
+   #app を画面全体に固定し、safe-area を考慮したパディングを付与。
+   iOS PWA ホーム画面追加時はステータスバー領域が黒で上書きされるため
+   padding-top で押し下げる必要がある。
+   ============================================================ */
+
+#app {
+  position: fixed;
+  /* safe-area を四方に適用 */
+  top:    0;
+  left:   0;
+  right:  0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  /* iOS PWAのステータスバー分を上に確保 */
+  padding-top: var(--safe-top);
+}
+
+#main-content {
+  flex: 1;
+  min-height: 0;           /* flex内スクロールに必須 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  /* タブバー高さ + ホームインジケーター + 余白分を下に空ける */
+  padding-bottom: calc(var(--tab-h) + var(--safe-bottom) + 24px);
+}
+
+/* ============================================================
+   TAB BAR
+   ============================================================ */
+
+#tab-bar {
+  position: relative;           /* fixed ではなく flex の末尾要素として配置 */
+  height: calc(var(--tab-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: var(--bg-card);
+  border-top: 1px solid var(--bg-border);
+  display: flex;
+  align-items: stretch;
+  z-index: 100;
+  flex-shrink: 0;               /* タブバーが縮まないよう固定 */
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+  padding: 6px 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn.active { color: var(--accent-strong); }
+.tab-btn:active { opacity: 0.7; }
+.tab-icon  { width: 22px; height: 22px; }
+.tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+
+#toast {
+  position: fixed;
+  /* タブバーの上に表示。タブバーが relative になったので fixed で合わせる */
+  bottom: calc(var(--tab-h) + var(--safe-bottom) + 16px);
+  left: 50%; transform: translateX(-50%) translateY(20px);
+  background: #2a313a;
+  color: var(--text-primary);
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  z-index: 200;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============================================================
+   OFFLINE
+   ============================================================ */
+
+#offline-badge {
+  display: none;
+  position: fixed;
+  top: calc(var(--safe-top) + 12px);
+  left: 50%; transform: translateX(-50%);
+  background: var(--warn);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  z-index: 300;
+}
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+
+.section-card {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-border);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 0 14px 12px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.section-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 6px 0 12px;
+}
+
+/* ============================================================
+   HOME
+   ============================================================ */
+
+.home-header { padding: 20px 16px 10px; }
+
+.home-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-date { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.home-sub  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.refresh-btn {
+  width: 36px; height: 36px;
+  background: var(--bg-card);
+  border: 1px solid var(--bg-border);
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s, background 0.15s;
+}
+.refresh-btn:active { color: var(--accent-strong); background: var(--accent-bg); }
+.refresh-btn svg { width: 16px; height: 16px; }
+
+/* ============================================================
+   TODAY TASKS
+   ============================================================ */
+
+.today-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bg-border);
+}
+.today-task:last-child { border-bottom: none; }
+.today-task.done .task-title { text-decoration: line-through; opacity: 0.45; }
+
+/* ============================================================
+   TASK LIST
+   ============================================================ */
+
+.page-title { font-size: 22px; font-weight: 700; padding: 20px 16px 8px; }
+.task-list  { padding: 0 14px 80px; }
+
+.task-list-item {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-border);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.task-list-item.done { opacity: 0.5; }
+.task-list-item.done .task-title { text-decoration: line-through; }
+
+.task-list-main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.task-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   TASK SHARED
+   ============================================================ */
+
+.task-check {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-border);
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.task-check:hover { border-color: var(--accent-strong); }
+.task-check.checked { background: var(--accent-strong); border-color: var(--accent-strong); color: #0d1117; }
+.task-check svg { width: 13px; height: 13px; }
+.task-check.weekly-icon { border: none; background: var(--accent-bg); color: var(--accent-soft); cursor: default; }
+
+.task-body    { flex: 1; min-width: 0; }
+.task-top-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.task-title   { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.4; }
+.task-meta    { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+
+/* ============================================================
+   BADGES & CHIPS
+   ============================================================ */
+
+.load-badge {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px; border: 1px solid;
+  white-space: nowrap;
+}
+
+.dl-chip {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: rgba(139,148,158,0.12);
+  color: var(--text-muted);
+  border: 1px solid rgba(139,148,158,0.2);
+  white-space: nowrap;
+}
+.dl-chip.dl-over  { background: rgba(226,75,74,0.12);  color: var(--bad);  border-color: rgba(226,75,74,0.3); }
+.dl-chip.dl-today { background: rgba(226,75,74,0.10);  color: var(--bad);  border-color: rgba(226,75,74,0.3); }
+.dl-chip.dl-soon  { background: rgba(224,144,48,0.12); color: var(--warn); border-color: rgba(224,144,48,0.3); }
+
+.weekday-str { font-size: 10px; color: var(--text-muted); }
+
+.src-tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+.src-tag.overdue  { background: rgba(226,75,74,0.15);  color: var(--bad); }
+.src-tag.today-dl { background: rgba(226,75,74,0.12);  color: var(--bad); }
+.src-tag.urgent   { background: rgba(224,144,48,0.15); color: var(--warn); }
+.src-tag.weekly   { background: var(--accent-bg);      color: var(--accent-strong); }
+
+/* ============================================================
+   LOAD BAR
+   ============================================================ */
+
+.load-bar-wrap  { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.load-bar-track { width: 80px; height: 5px; background: var(--bg-border); border-radius: 3px; overflow: hidden; }
+.load-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.35s, background 0.35s; }
+.load-bar-label { font-size: 11px; font-weight: 700; min-width: 54px; text-align: right; }
+
+/* ============================================================
+   EMPTY STATE
+   ============================================================ */
+
+.empty-state  { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+.empty-icon   { font-size: 36px; margin-bottom: 10px; }
+.empty-title  { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.empty-sub    { font-size: 13px; color: var(--text-muted); }
+
+/* ============================================================
+   SUB TABS
+   ============================================================ */
+
+.sub-tabs {
+  display: flex;
+  padding: 0 14px 12px;
+  border-bottom: 1px solid var(--bg-border);
+  margin-bottom: 12px;
+}
+.sub-tab {
+  flex: 1; padding: 8px 4px;
+  background: none; border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 12px; font-weight: 600;
+  cursor: pointer; text-align: center;
+  transition: color 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.sub-tab.active { color: var(--accent-strong); border-bottom-color: var(--accent-strong); }
+
+.tab-count {
+  display: inline-block;
+  background: var(--accent-strong); color: #0d1117;
+  font-size: 9px; font-weight: 800;
+  padding: 1px 5px; border-radius: 10px;
+  margin-left: 3px; vertical-align: middle;
+}
+
+/* ============================================================
+   FAB
+   ============================================================ */
+
+.fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(var(--tab-h) + var(--safe-bottom) + 16px);
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--accent-strong); color: #0d1117;
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(153,216,255,0.35);
+  z-index: 90;
+  transition: transform 0.15s, box-shadow 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.fab:active { transform: scale(0.93); box-shadow: 0 2px 10px rgba(153,216,255,0.25); }
+.fab svg { width: 22px; height: 22px; }
+
+/* ============================================================
+   ICON BUTTONS
+   ============================================================ */
+
+.icon-btn {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  background: var(--bg-base); border: 1px solid var(--bg-border);
+  color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:hover { color: var(--text-primary); background: var(--bg-border); }
+.icon-btn.danger:hover { color: var(--bad); border-color: var(--bad); background: rgba(226,75,74,0.08); }
+.icon-btn svg { width: 15px; height: 15px; }
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: flex-end; justify-content: center;
+  z-index: 150;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: auto; }
+.modal-overlay.open .modal { transform: translateY(0); }
+
+.modal {
+  background: var(--bg-card);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 20px calc(20px + var(--safe-bottom));
+  width: 100%; max-width: 540px;
+  max-height: 92vh; overflow-y: auto;
+  transform: translateY(60px);
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.modal-title    { font-size: 17px; font-weight: 700; color: var(--text-primary); margin-bottom: 18px; }
+.modal-actions  { display: flex; gap: 10px; margin-top: 20px; }
+.modal-actions .btn { flex: 1; }
+
+/* ============================================================
+   FORMS
+   ============================================================ */
+
+.form-group { margin-bottom: 14px; }
+.form-group label {
+  display: block;
+  font-size: 11px; font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-bottom: 7px;
+}
+.label-optional { font-size: 10px; font-weight: 500; color: var(--text-muted); text-transform: none; letter-spacing: 0; }
+
+input[type="text"], input[type="date"], select, textarea {
+  width: 100%;
+  background: var(--bg-base); border: 1.5px solid var(--bg-border);
+  border-radius: 10px; padding: 10px 12px;
+  color: var(--text-primary); font-size: 14px;
+  outline: none; transition: border-color 0.15s;
+  appearance: none; -webkit-appearance: none;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent-strong); }
+input::placeholder { color: var(--text-muted); }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.6); }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+
+.btn {
+  padding: 11px 16px; border-radius: 10px;
+  font-size: 14px; font-weight: 600;
+  border: none; cursor: pointer; text-align: center;
+  transition: opacity 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active    { opacity: 0.8; transform: scale(0.98); }
+.btn-primary   { background: var(--accent-strong); color: #0d1117; }
+.btn-secondary { background: var(--bg-base); color: var(--text-secondary); border: 1px solid var(--bg-border); }
+.btn-danger    { background: rgba(226,75,74,0.12); color: var(--bad); border: 1px solid rgba(226,75,74,0.25); }
+.btn-full      { width: 100%; }
+.btn-sm        { padding: 7px 14px; font-size: 12px; }
+
+/* ============================================================
+   TYPE SELECTOR
+   ============================================================ */
+
+.type-selector {
+  display: flex;
+  background: var(--bg-base); border: 1px solid var(--bg-border);
+  border-radius: 10px; overflow: hidden;
+}
+.type-btn {
+  flex: 1; padding: 9px;
+  background: none; border: none;
+  color: var(--text-muted); font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.type-btn.active { background: var(--accent-bg); color: var(--accent-strong); }
+
+/* ============================================================
+   WEEKDAY SELECTOR
+   ============================================================ */
+
+.weekday-selector { display: flex; gap: 6px; }
+.wd-btn {
+  flex: 1; aspect-ratio: 1;
+  background: var(--bg-base); border: 1.5px solid var(--bg-border);
+  border-radius: 8px; color: var(--text-muted);
+  font-size: 12px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  padding: 6px 0;
+}
+.wd-btn.active { background: var(--accent-bg); color: var(--accent-strong); border-color: var(--accent-border); }
+
+/* ============================================================
+   LOAD SELECTOR
+   ============================================================ */
+
+.load-selector { display: flex; gap: 6px; }
+.load-radio {
+  flex: 1;
+  background: var(--bg-base); border: 1.5px solid var(--bg-border);
+  border-radius: 10px; padding: 8px 4px;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.load-num { font-size: 16px; font-weight: 800; color: var(--text-primary); }
+.load-lbl { font-size: 9px; font-weight: 600; color: var(--text-muted); }
+.load-radio[data-load="1"].active { border-color: #3aaa72; background: rgba(58,170,114,0.10); }
+.load-radio[data-load="2"].active { border-color: #76c0ea; background: rgba(118,192,234,0.10); }
+.load-radio[data-load="3"].active { border-color: #e09030; background: rgba(224,144,48,0.10); }
+.load-radio[data-load="4"].active { border-color: #e24b4a; background: rgba(226,75,74,0.10); }
+.load-radio[data-load="5"].active { border-color: #a855f7; background: rgba(168,85,247,0.10); }
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+
+.page-settings { padding-bottom: 40px; }
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px; margin-top: 10px;
+}
+.summary-item  { background: var(--bg-base); border-radius: 10px; padding: 10px 6px; text-align: center; }
+.summary-num   { display: block; font-size: 20px; font-weight: 800; color: var(--text-primary); }
+.summary-label { display: block; font-size: 9px; font-weight: 600; color: var(--text-muted); margin-top: 2px; }
+
+.capacity-control { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.capacity-control input[type="range"] { flex: 1; padding: 0; border: none; accent-color: var(--accent-strong); cursor: pointer; }
+#capacity-value { font-size: 18px; font-weight: 800; color: var(--accent-strong); min-width: 28px; text-align: center; }
+
+.load-guide       { margin-top: 14px; }
+.load-guide-title { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.load-guide-row   { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.load-guide-desc  { font-size: 12px; color: var(--text-muted); }
+
+.settings-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.version-info     { text-align: center; font-size: 11px; color: var(--text-muted); padding: 20px 0 8px; }
+
+/* ============================================================
+   WALLPAPER
+   ============================================================ */
+
+#bg-image { z-index: 0; }
+#app, #toast, .modal-overlay, #offline-badge { position: relative; z-index: 1; }
+#app { position: fixed; }
+.modal-overlay  { z-index: 150; }
+#toast          { z-index: 200; }
+#offline-badge  { z-index: 300; }
+
+body.has-bg .section-card {
+  background: rgba(22,27,34,0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+body.has-bg #tab-bar {
+  background: rgba(22,27,34,0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.bg-preview-wrap { margin-bottom: 12px; }
+.bg-preview {
+  width: 100%; height: 100px;
+  border-radius: 10px;
+  background-size: cover; background-position: center;
+  border: 1.5px solid var(--bg-border);
+}
+.bg-preview.empty {
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: 13px;
+  background: var(--bg-base);
+}
+.bg-actions { display: flex; gap: 8px; }
+
+/* ============================================================
+   CONFIRM MODAL（リセット・削除確認）
+   ============================================================ */
+
+.modal-confirm-inner { max-height: 60vh; }
+
+/* ============================================================
+   v2.2 追加スタイル
+   ============================================================ */
+
+/* 負荷メーター（残りキャパ表示対応版） */
+.load-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.load-meter-bar {
+  width: 90px; height: 5px;
+  background: var(--bg-border);
+  border-radius: 3px; overflow: hidden;
+}
+.load-meter-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.35s, background 0.35s;
+}
+.load-meter-label {
+  font-size: 11px; font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+.load-meter-label strong { font-size: 14px; }
+
+/* 休日バッジ（今日ページの日付横） */
+.holiday-badge {
+  display: inline-block;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 20px;
+  background: rgba(168,85,247,0.15);
+  color: #a855f7;
+  border: 1px solid rgba(168,85,247,0.3);
+  margin-left: 7px;
+  vertical-align: middle;
+}
+
+/* 祝日管理 */
+.holiday-add-row {
+  display: flex; gap: 8px; align-items: center;
+  margin-bottom: 10px;
+}
+.holiday-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.holiday-item {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg-base); border: 1px solid var(--bg-border);
+  border-radius: 8px; padding: 8px 10px;
+}
+.holiday-date { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+.holiday-empty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 10px 0; }
+
+/* ============================================================
+   v2.3 追加: 未完了組み直しボタン（控えめ表示）
+   ============================================================ */
+.rebalance-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+  border-top: 1px solid var(--bg-border);
+  margin-top: 4px;
+}
+.rebalance-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 20px;
+  transition: color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.rebalance-btn:hover,
+.rebalance-btn:active { color: var(--text-secondary); background: var(--bg-border); }
+
+</style>
+</head>
+<body>
+<div id="offline-badge">オフライン</div>
+<div id="toast"></div>
+
+<div id="app">
+  <div id="main-content"></div>
+  <nav id="tab-bar">
+    <button class="tab-btn active" data-page="home" onclick="navigateTo('home')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none">
+        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M9 21V12h6v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="tab-label">今日</span>
+    </button>
+    <button class="tab-btn" data-page="tasks" onclick="navigateTo('tasks')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <line x1="9" y1="9"  x2="15" y2="9"  stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9" y1="12" x2="15" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9" y1="15" x2="13" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span class="tab-label">タスク</span>
+    </button>
+    <button class="tab-btn" data-page="settings" onclick="navigateTo('settings')">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
+      </svg>
+      <span class="tab-label">設定</span>
+    </button>
+  </nav>
+</div>
+
+<!-- タスク追加・編集モーダル -->
+<div class="modal-overlay" id="modal-task">
+  <div class="modal">
+    <div class="modal-title" id="modal-task-title">タスクを追加</div>
+    <div class="form-group">
+      <label>タイトル</label>
+      <input type="text" id="input-task-title" placeholder="例：レポート提出"
+             autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    </div>
+    <div class="form-group">
+      <label>繰り返し</label>
+      <div class="type-selector">
+        <button type="button" class="type-btn active" data-type="once"   onclick="setTaskType('once')">一回のみ</button>
+        <button type="button" class="type-btn"        data-type="weekly" onclick="setTaskType('weekly')">毎週繰り返す</button>
+      </div>
+    </div>
+    <div class="form-group" id="deadline-row">
+      <label>期限 <span class="label-optional">任意</span></label>
+      <input type="date" id="input-task-deadline">
+    </div>
+    <div class="form-group" id="weekdays-row" style="display:none">
+      <label>繰り返す曜日</label>
+      <div class="weekday-selector">
+        <button type="button" class="wd-btn" data-dow="1" onclick="toggleWeekday(this)">月</button>
+        <button type="button" class="wd-btn" data-dow="2" onclick="toggleWeekday(this)">火</button>
+        <button type="button" class="wd-btn" data-dow="3" onclick="toggleWeekday(this)">水</button>
+        <button type="button" class="wd-btn" data-dow="4" onclick="toggleWeekday(this)">木</button>
+        <button type="button" class="wd-btn" data-dow="5" onclick="toggleWeekday(this)">金</button>
+        <button type="button" class="wd-btn" data-dow="6" onclick="toggleWeekday(this)">土</button>
+        <button type="button" class="wd-btn" data-dow="0" onclick="toggleWeekday(this)">日</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>負荷値（作業量の目安）</label>
+      <div class="load-selector">
+        <button type="button" class="load-radio" data-load="1" onclick="setLoadValue(this)"><span class="load-num">1</span><span class="load-lbl">極軽</span></button>
+        <button type="button" class="load-radio" data-load="2" onclick="setLoadValue(this)"><span class="load-num">2</span><span class="load-lbl">軽</span></button>
+        <button type="button" class="load-radio active" data-load="3" onclick="setLoadValue(this)"><span class="load-num">3</span><span class="load-lbl">普通</span></button>
+        <button type="button" class="load-radio" data-load="4" onclick="setLoadValue(this)"><span class="load-num">4</span><span class="load-lbl">重</span></button>
+        <button type="button" class="load-radio" data-load="5" onclick="setLoadValue(this)"><span class="load-num">5</span><span class="load-lbl">最大</span></button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-task')">キャンセル</button>
+      <button class="btn btn-primary"   onclick="saveTask()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- タスク削除確認モーダル -->
+<div class="modal-overlay" id="modal-delete-confirm">
+  <div class="modal modal-confirm-inner">
+    <div class="modal-title" style="color:var(--bad)">🗑 タスクを削除</div>
+    <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:20px">
+      このタスクを削除しますか？<br>この操作は取り消せません。
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-delete-confirm')">キャンセル</button>
+      <button class="btn btn-danger"    onclick="executeDeleteTask()">削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 全データリセット確認モーダル -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal modal-confirm-inner">
+    <div class="modal-title" style="color:var(--bad)">⚠️ データをリセット</div>
+    <p style="font-size:14px;color:var(--text-secondary);line-height:1.6;margin-bottom:20px">
+      全てのタスクと設定が削除されます。<br>この操作は取り消せません。
+    </p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-confirm')">キャンセル</button>
+      <button class="btn btn-danger"    onclick="executeReset()">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// === config.js ===
+// config.js — Altair v2.1
+// 依存: なし
+// 責務: アプリ全体の定数定義
+
+const CFG = {
+
+  APP_NAME:    'Altair',
+  APP_VERSION: '2.3',
+  STORAGE_KEY: 'altair_v2',
+
+  // 負荷値ラベル・カラー (1〜5)
+  LOAD_LABELS: { 1: '極軽', 2: '軽', 3: '普通', 4: '重', 5: '最大' },
+  LOAD_COLORS: {
+    1: '#3aaa72',
+    2: '#76c0ea',
+    3: '#e09030',
+    4: '#e24b4a',
+    5: '#a855f7',
+  },
+
+  // 曜日名（日曜=0〜土曜=6）
+  WEEKDAY_NAMES: ['日', '月', '火', '水', '木', '金', '土'],
+
+  // 1日のデフォルト総負荷キャパシティ
+  DEFAULT_DAILY_CAPACITY: 10,
+
+};
+
+
+// === store.js ===
+// store.js — Altair v2.3
+// 依存: config.js
+// 責務: 状態管理・localStorage・割り当てエンジン
+
+var S = {};
+
+var STATE_DEFAULTS = {
+  tasks:     [],
+  todayPlan: null,  // { date: 'YYYY-MM-DD', entries: [{id, load, src, type}] }
+  settings: {
+    capacityWeekday: 10,
+    capacityHoliday: 6,
+    holidays: [],
+    bg: '',
+    bgOpacity: 65,
+  },
+};
+
+// ============================================================
+// LOAD / SAVE
+// ============================================================
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem(CFG.STORAGE_KEY);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      // STATE_DEFAULTS と深くマージ（settings は Object.assign で後述）
+      S = Object.assign({}, STATE_DEFAULTS, parsed);
+    } else {
+      S = Object.assign({}, STATE_DEFAULTS);
+    }
+  } catch(e) {
+    S = Object.assign({}, STATE_DEFAULTS);
+  }
+
+  if (!Array.isArray(S.tasks)) S.tasks = [];
+
+  // 旧 dailyCapacity との後方互換
+  var saved = S.settings || {};
+  S.settings = Object.assign(
+    {
+      capacityWeekday: saved.dailyCapacity || CFG.DEFAULT_DAILY_CAPACITY,
+      capacityHoliday: 6,
+      holidays: [],
+      bg: '',
+      bgOpacity: 65,
+    },
+    saved
+  );
+  delete S.settings.dailyCapacity;
+
+  if (S.todayPlan && !Array.isArray(S.todayPlan.entries)) S.todayPlan = null;
+
+  // 起動時: 完了済み once タスクのうち翌日以降のものを削除
+  _purgeDoneTasks();
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(CFG.STORAGE_KEY, JSON.stringify(S));
+  } catch(e) {
+    showToast('保存失敗（容量不足の可能性があります）');
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function today() {
+  var d = new Date();
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function localDateStr(d) {
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+function sanitize(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function dateAddDays(dateStr, n) {
+  var d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return localDateStr(d);
+}
+
+function dayOfWeek(dateStr) {
+  return new Date(dateStr + 'T00:00:00').getDay();
+}
+
+function daysUntil(deadlineStr) {
+  var now = new Date(); now.setHours(0, 0, 0, 0);
+  var dl  = new Date(deadlineStr + 'T00:00:00');
+  return Math.round((dl - now) / 86400000);
+}
+
+/** 土日 or ユーザー登録祝日なら true */
+function isHoliday(dateStr) {
+  var dow = dayOfWeek(dateStr);
+  if (dow === 0 || dow === 6) return true;
+  return ((S.settings && S.settings.holidays) || []).includes(dateStr);
+}
+
+/** 今日のキャパシティ */
+function getTodayCapacity() {
+  return isHoliday(today())
+    ? (S.settings.capacityHoliday || 6)
+    : (S.settings.capacityWeekday || CFG.DEFAULT_DAILY_CAPACITY);
+}
+
+// ============================================================
+// AUTO PURGE — 翌日起動時に完了済み once タスクを削除
+// ============================================================
+
+function _purgeDoneTasks() {
+  var todayStr = today();
+  var before   = S.tasks.length;
+  S.tasks = S.tasks.filter(function(t) {
+    if (t.type === 'weekly') return true;
+    if (!t.done) return true;
+    // doneDate が今日以降なら残す（翌日になったら消す）
+    return t.doneDate && t.doneDate >= todayStr;
+  });
+  if (S.tasks.length !== before) S.todayPlan = null;
+}
+
+// ============================================================
+// TASK HELPERS
+// ============================================================
+
+function isWeeklyDoneOn(task, dateStr) {
+  return Array.isArray(task.doneHistory) && task.doneHistory.includes(dateStr);
+}
+
+function markWeeklyDoneToday(taskId) {
+  var t = S.tasks.find(function(t) { return t.id === taskId; });
+  if (!t || t.type !== 'weekly') return;
+  if (!Array.isArray(t.doneHistory)) t.doneHistory = [];
+  var d = today();
+  if (!t.doneHistory.includes(d)) t.doneHistory.push(d);
+  saveState();
+}
+
+function unmarkWeeklyDoneToday(taskId) {
+  var t = S.tasks.find(function(t) { return t.id === taskId; });
+  if (!t || t.type !== 'weekly') return;
+  if (!Array.isArray(t.doneHistory)) return;
+  var d = today();
+  t.doneHistory = t.doneHistory.filter(function(x) { return x !== d; });
+  saveState();
+}
+
+function toggleOnceDone(taskId) {
+  var t = S.tasks.find(function(t) { return t.id === taskId; });
+  if (!t || t.type !== 'once') return;
+  t.done     = !t.done;
+  t.doneDate = t.done ? today() : null;
+  saveState();
+}
+
+// ============================================================
+// SNAPSHOT ENGINE
+//
+// 【フルリセット生成 _generateSnapshot】
+//   毎日初回・タスク追加・削除・完全リセット時に呼ばれる。
+//   完了済みタスクは candidates から除外済みなので、
+//   スナップには未完了タスクだけが入る。
+//
+// 【差分リバランス _rebalanceSnapshot】
+//   キャパ変更・手動再割り当て時に呼ばれる。
+//   完了済みエントリはそのまま保持し、
+//   未完了エントリだけを「残りキャパ」で組み直す。
+//   → 達成した負荷は絶対に消えない。
+//
+// 【優先順位（両関数共通）】
+//   1. 週次タスク（曜日一致）← キャパ無視で強制
+//   2. 期限切れ              ← キャパ無視で強制
+//   3. 本日期限              ← キャパ無視で強制
+//   4. 明日期限              ← キャパ無視で強制
+//   5. 期限あり（明後日以降）← 残りキャパで選択
+//   6. 期限なし              ← 残りキャパを貪欲充填
+// ============================================================
+
+function _ensureSnapshot(todayStr) {
+  if (S.todayPlan && S.todayPlan.date === todayStr && Array.isArray(S.todayPlan.entries)) {
+    return S.todayPlan;
+  }
+  return _generateSnapshot(todayStr);
+}
+
+/** フル生成（当日初回 / タスク追加・削除時） */
+function _generateSnapshot(todayStr) {
+  var capacity = isHoliday(todayStr)
+    ? (S.settings.capacityHoliday || 6)
+    : (S.settings.capacityWeekday || CFG.DEFAULT_DAILY_CAPACITY);
+
+  var entries  = [];
+  var usedLoad = 0;
+  var ids      = {};
+
+  function add(t, src, type) {
+    entries.push({ id: t.id, load: t.load || 1, src: src, type: type });
+    usedLoad += (t.load || 1);
+    ids[t.id]  = true;
+  }
+
+  _fillEntries(todayStr, capacity, entries, usedLoad, ids, add);
+
+  S.todayPlan = { date: todayStr, entries: entries };
+  saveState();
+  return S.todayPlan;
+}
+
+/**
+ * 差分リバランス（完了保持・未完了だけ組み直し）
+ *
+ * キャパ変更・手動再割り当て時に呼ぶ。
+ * 完了済みエントリの負荷合計を「消費済み」として、
+ * 残りキャパで未完了タスクを再充填する。
+ */
+function rebalanceSnapshot() {
+  var todayStr = today();
+  var capacity = isHoliday(todayStr)
+    ? (S.settings.capacityHoliday || 6)
+    : (S.settings.capacityWeekday || CFG.DEFAULT_DAILY_CAPACITY);
+
+  // 完了済みエントリを保持
+  var keptEntries = [];
+  var usedLoad    = 0;
+  var ids         = {};
+
+  if (S.todayPlan && S.todayPlan.date === todayStr && Array.isArray(S.todayPlan.entries)) {
+    S.todayPlan.entries.forEach(function(entry) {
+      var t = S.tasks.find(function(t) { return t.id === entry.id; });
+      if (!t) return; // 削除済みはスキップ
+      var isDone = entry.type === 'weekly'
+        ? isWeeklyDoneOn(t, todayStr)
+        : t.done;
+      if (isDone) {
+        // 完了済みはそのまま保持
+        keptEntries.push(entry);
+        usedLoad += entry.load;
+        ids[entry.id] = true;
+      }
+      // 未完了は破棄して再充填する
+    });
+  }
+
+  // 未完了を再充填
+  _fillEntries(todayStr, capacity, keptEntries, usedLoad, ids, function(t, src, type) {
+    keptEntries.push({ id: t.id, load: t.load || 1, src: src, type: type });
+    usedLoad += (t.load || 1);
+    ids[t.id]  = true;
+  });
+
+  S.todayPlan = { date: todayStr, entries: keptEntries };
+  saveState();
+  return S.todayPlan;
+}
+
+/**
+ * エントリ充填の共通ロジック。
+ * entries / usedLoad / ids は呼び出し元から渡されて変更される。
+ */
+function _fillEntries(todayStr, capacity, entries, usedLoad, ids, add) {
+  var dow      = dayOfWeek(todayStr);
+  var tomorrow = dateAddDays(todayStr, 1);
+
+  // Step 1: 週次タスク（強制）
+  S.tasks
+    .filter(function(t) {
+      return t.type === 'weekly'
+        && Array.isArray(t.weekDays)
+        && t.weekDays.includes(dow)
+        && !ids[t.id];
+    })
+    .forEach(function(t) { add(t, 'weekly', 'weekly'); });
+
+  // Step 2〜4: once 未完了候補
+  var candidates = S.tasks.filter(function(t) {
+    return t.type !== 'weekly' && !t.done && !ids[t.id];
+  });
+
+  // Step 2: 期限切れ（強制）
+  candidates
+    .filter(function(t) { return t.deadline && t.deadline < todayStr; })
+    .sort(function(a, b) { return a.deadline.localeCompare(b.deadline); })
+    .forEach(function(t) { add(t, 'overdue', 'once'); });
+
+  // Step 3: 本日期限（強制）
+  candidates
+    .filter(function(t) { return t.deadline === todayStr && !ids[t.id]; })
+    .forEach(function(t) { add(t, 'today_dl', 'once'); });
+
+  // Step 4: 明日期限（強制）
+  candidates
+    .filter(function(t) { return t.deadline === tomorrow && !ids[t.id]; })
+    .forEach(function(t) { add(t, 'urgent', 'once'); });
+
+  // Step 5〜6: キャパ余裕分
+  var remaining = capacity - usedLoad;
+
+  // Step 5: 期限あり（明後日以降・近い順）
+  candidates
+    .filter(function(t) { return t.deadline && t.deadline > tomorrow && !ids[t.id]; })
+    .sort(function(a, b) { return a.deadline.localeCompare(b.deadline); })
+    .forEach(function(t) {
+      if (remaining > 0 && (t.load || 1) <= remaining) {
+        add(t, 'deadline', 'once');
+        remaining -= (t.load || 1);
+      }
+    });
+
+  // Step 6: 期限なし（重い順で貪欲充填）
+  var noDl = candidates
+    .filter(function(t) { return !t.deadline && !ids[t.id]; })
+    .sort(function(a, b) { return (b.load || 1) - (a.load || 1); });
+
+  var changed = true;
+  while (changed && remaining > 0) {
+    changed = false;
+    for (var i = 0; i < noDl.length; i++) {
+      if (ids[noDl[i].id]) continue;
+      if ((noDl[i].load || 1) <= remaining) {
+        add(noDl[i], 'buffer', 'once');
+        remaining -= (noDl[i].load || 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+}
+
+// ============================================================
+// TODAY STATS
+// ============================================================
+
+/**
+ * @returns {{
+ *   capacity: number,
+ *   totalLoad: number,        // スナップ内の負荷合計
+ *   doneLoad: number,         // 完了済み負荷合計
+ *   remainingCapacity: number,// capacity - doneLoad（表示用）
+ *   pendingTasks: Array,
+ *   capacityReached: boolean, // doneLoad >= capacity
+ *   allDone: boolean,         // 未完了タスクゼロ（キャパ未達でも）
+ * }}
+ */
+function getTodayStats() {
+  var todayStr = today();
+  var snap     = _ensureSnapshot(todayStr);
+  var capacity = isHoliday(todayStr)
+    ? (S.settings.capacityHoliday || 6)
+    : (S.settings.capacityWeekday || CFG.DEFAULT_DAILY_CAPACITY);
+
+  var totalLoad = 0, doneLoad = 0, pendingTasks = [];
+
+  snap.entries.forEach(function(entry) {
+    var t = S.tasks.find(function(t) { return t.id === entry.id; });
+    if (!t) return;
+    var isDone = entry.type === 'weekly'
+      ? isWeeklyDoneOn(t, todayStr)
+      : t.done;
+    totalLoad += entry.load;
+    if (isDone) {
+      doneLoad += entry.load;
+    } else {
+      pendingTasks.push(Object.assign({}, t, { _src: entry.src, _snapLoad: entry.load }));
+    }
+  });
+
+  return {
+    capacity:          capacity,
+    totalLoad:         totalLoad,
+    doneLoad:          doneLoad,
+    remainingCapacity: capacity - doneLoad,
+    pendingTasks:      pendingTasks,
+    capacityReached:   doneLoad >= capacity,
+    allDone:           pendingTasks.length === 0 && totalLoad > 0,
+  };
+}
+
+/**
+ * タスク追加・削除時に呼ぶ完全リセット。
+ * 翌回 getTodayStats() 呼び出し時に _generateSnapshot が走る。
+ */
+function resetTodayPlan() {
+  S.todayPlan = null;
+  saveState();
+}
+
+function removeFromSnapshot(taskId) {
+  if (!S.todayPlan || !Array.isArray(S.todayPlan.entries)) return;
+  S.todayPlan.entries = S.todayPlan.entries.filter(function(e) { return e.id !== taskId; });
+  saveState();
+}
+
+// ============================================================
+// EXPORT / IMPORT / RESET
+// ============================================================
+
+function exportData() {
+  var blob = new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' });
+  var a    = document.createElement('a');
+  a.href   = URL.createObjectURL(blob);
+  a.download = 'altair_' + today() + '.json';
+  a.click();
+  showToast('エクスポート完了');
+}
+
+function importData(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var parsed = JSON.parse(ev.target.result);
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        showToast('エラー：データ形式が不正です'); return;
+      }
+      if (!Array.isArray(parsed.tasks)) parsed.tasks = [];
+      parsed.tasks = parsed.tasks.map(function(t) {
+        return Object.assign({}, t, { title: sanitize(t.title || '') });
+      });
+      S = Object.assign({}, S, parsed);
+      if (S.settings && S.settings.bg) applyBackground(S.settings.bg, S.settings.bgOpacity);
+      saveState();
+      showToast('インポート完了');
+      navigateTo('home');
+    } catch(e) {
+      showToast('エラー：ファイルが無効です');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function executeReset() {
+  // 1. モーダルを閉じる
+  closeModal('modal-confirm');
+
+  // 2. localStorage を完全消去
+  try { localStorage.removeItem(CFG.STORAGE_KEY); } catch(e) {}
+
+  // 3. メモリ上の S を初期値で上書き（参照ごと作り直す）
+  S = {
+    tasks:     [],
+    todayPlan: null,
+    settings: {
+      capacityWeekday: CFG.DEFAULT_DAILY_CAPACITY,
+      capacityHoliday: 6,
+      holidays: [],
+      bg: '',
+      bgOpacity: 65,
+    },
+  };
+
+  // 4. 壁紙を除去
+  applyBackground('', 0);
+
+  // 5. 初期状態を localStorage に書き込む（空読み込みで旧データが復元されるのを防ぐ）
+  try { localStorage.setItem(CFG.STORAGE_KEY, JSON.stringify(S)); } catch(e) {}
+
+  // 6. 画面更新（S が完全に初期化された後に呼ぶ）
+  showToast('全データをリセットしました');
+  navigateTo('home');
+}
+
+
+// === app-common.js ===
+// app-common.js — Altair v2.1
+// 依存: config.js, store.js
+// 責務: UI操作・共通ユーティリティ
+
+// ============================================================
+// TOAST
+// ============================================================
+
+let _toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  clearTimeout(_toastTimer);
+  el.textContent = msg;
+  el.classList.add('show');
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+
+function openModal(id) {
+  document.getElementById(id)?.classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById(id)?.classList.remove('open');
+}
+
+// ============================================================
+// BADGE / CHIP
+// ============================================================
+
+/** 負荷値バッジのHTMLを返す */
+function loadBadge(load) {
+  const c = CFG.LOAD_COLORS[load] || '#8b949e';
+  const l = CFG.LOAD_LABELS[load] || load;
+  return '<span class="load-badge" style="background:' + c + '20;color:' + c + ';border-color:' + c + '40">' + l + '</span>';
+}
+
+/** 期限チップのHTMLを返す（期限なしなら空文字） */
+function deadlineChip(deadline) {
+  if (!deadline) return '';
+  const days = daysUntil(deadline);
+  let cls = 'dl-chip';
+  if      (days < 0)       cls += ' dl-over';
+  else if (days === 0)     cls += ' dl-today';
+  else if (days <= 3)      cls += ' dl-soon';
+  let label = '';
+  if      (days < 0)       label = Math.abs(days) + '日超過';
+  else if (days === 0)     label = '今日まで';
+  else if (days === 1)     label = '明日まで';
+  else                     label = 'あと' + days + '日';
+  return '<span class="' + cls + '">' + label + '</span>';
+}
+
+// ============================================================
+// TASK MODAL HELPERS
+// ============================================================
+
+function toggleWeekday(btn) {
+  btn.classList.toggle('active');
+}
+
+function getSelectedWeekdays() {
+  return Array.from(document.querySelectorAll('.wd-btn.active'))
+    .map(function(b) { return +b.dataset.dow; });
+}
+
+// ============================================================
+// BACKGROUND
+// ============================================================
+
+function applyBackground(url, opacity) {
+  let el = document.getElementById('bg-image');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'bg-image';
+    el.style.cssText = 'position:fixed;inset:0;z-index:0;background-size:cover;background-position:center;pointer-events:none;';
+    const ov = document.createElement('div');
+    ov.id = 'bg-overlay';
+    ov.style.cssText = 'position:absolute;inset:0;';
+    el.appendChild(ov);
+    document.body.insertBefore(el, document.body.firstChild);
+  }
+  if (url) {
+    const alpha = Math.round((opacity !== undefined ? opacity : 65) / 100 * 255).toString(16).padStart(2, '0');
+    el.style.backgroundImage = "url('" + url + "')";
+    el.style.display = 'block';
+    document.getElementById('bg-overlay').style.background = '#0d1117' + alpha;
+    document.body.classList.add('has-bg');
+  } else {
+    el.style.display = 'none';
+    document.body.classList.remove('has-bg');
+  }
+}
+
+
+// === app-core.js ===
+// app-core.js — Altair v2.3
+// 依存: config.js, store.js, app-common.js
+// 責務: 初期化・ナビゲーション・今日ページ
+
+var currentPage = null;
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+
+function navigateTo(page) {
+  currentPage = page;
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.page === page);
+  });
+  document.getElementById('main-content').innerHTML = renderPage(page);
+  postRender(page);
+}
+
+function renderPage(page) {
+  switch (page) {
+    case 'home':     return renderHome();
+    case 'tasks':    return renderTasksPage();
+    case 'settings': return renderSettings();
+    default:         return renderHome();
+  }
+}
+
+function postRender(page) {
+  if (page === 'settings') {
+    var slW = document.getElementById('capacity-slider-weekday');
+    var vlW = document.getElementById('capacity-value-weekday');
+    if (slW && vlW) { slW.value = S.settings.capacityWeekday || CFG.DEFAULT_DAILY_CAPACITY; vlW.textContent = slW.value; }
+
+    var slH = document.getElementById('capacity-slider-holiday');
+    var vlH = document.getElementById('capacity-value-holiday');
+    if (slH && vlH) { slH.value = S.settings.capacityHoliday || 6; vlH.textContent = slH.value; }
+
+    var op = document.getElementById('opacity-slider');
+    var ov = document.getElementById('opacity-value');
+    if (op && ov) { op.value = S.settings.bgOpacity !== undefined ? S.settings.bgOpacity : 65; ov.textContent = op.value + '%'; }
+  }
+}
+
+// ============================================================
+// HOME
+// ============================================================
+
+function renderHome() {
+  var todayStr  = today();
+  var d         = new Date(todayStr + 'T00:00:00');
+  var dow       = d.getDay();
+  var dateLabel = d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日（' + CFG.WEEKDAY_NAMES[dow] + '）';
+  var holiday   = isHoliday(todayStr);
+
+  var stats           = getTodayStats();
+  var capacity        = stats.capacity;
+  var doneLoad        = stats.doneLoad;
+  var remainingCap    = stats.remainingCapacity;
+  var pendingTasks    = stats.pendingTasks;
+  var capacityReached = stats.capacityReached;
+  var allDone         = stats.allDone;
+
+  // ── 負荷メーター ──
+  var pct = capacity > 0 ? Math.min(100, Math.round(doneLoad / capacity * 100)) : 0;
+  var barColor = capacityReached ? 'var(--ok)' : remainingCap <= 2 ? 'var(--warn)' : 'var(--accent-soft)';
+  var loadLabel = capacityReached
+    ? '目標達成 🎯'
+    : '残り <strong>' + remainingCap + '</strong>/' + capacity;
+
+  var loadBar =
+    '<div class="load-meter">' +
+      '<div class="load-meter-bar">' +
+        '<div class="load-meter-fill" style="width:' + pct + '%;background:' + barColor + '"></div>' +
+      '</div>' +
+      '<div class="load-meter-label" style="color:' + barColor + '">' + loadLabel + '</div>' +
+    '</div>';
+
+  // ── タスクリスト ──
+  var taskHtml = '';
+  if (stats.totalLoad === 0) {
+    taskHtml =
+      '<div class="empty-state">' +
+        '<div class="empty-icon">📋</div>' +
+        '<div class="empty-title">タスクがありません</div>' +
+        '<div class="empty-sub">タスクタブから追加してください</div>' +
+      '</div>';
+  } else if (capacityReached) {
+    taskHtml =
+      '<div class="empty-state">' +
+        '<div class="empty-icon">🎯</div>' +
+        '<div class="empty-title">今日の目標達成！</div>' +
+        '<div class="empty-sub">キャパシティ（' + capacity + '）に達しました。よく頑張りました。</div>' +
+      '</div>';
+  } else if (allDone) {
+    // キャパ未達だが割り当てタスクはすべて完了
+    taskHtml =
+      '<div class="empty-state">' +
+        '<div class="empty-icon">✅</div>' +
+        '<div class="empty-title">今日の割り当てタスクをすべてこなしました</div>' +
+        '<div class="empty-sub">余裕があれば🔄で追加タスクを割り当てられます。</div>' +
+      '</div>';
+  } else {
+    taskHtml = pendingTasks.map(function(t) { return renderTodayTask(t, todayStr); }).join('');
+  }
+
+  // ── 再割り当てボタン（目立たない・リスト下部）──
+  // 「完了済みを保持したまま未完了タスクだけ組み直す」緊急修正用
+  var rebalanceBtn =
+    '<div class="rebalance-wrap">' +
+      '<button class="rebalance-btn" onclick="doRebalance()" title="完了済みを保持して未完了を組み直す">' +
+        '<svg viewBox="0 0 24 24" fill="none" width="13" height="13">' +
+          '<path d="M1 4v6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="M3.51 15a9 9 0 102.13-9.36L1 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+        '</svg>' +
+        '未完了タスクを組み直す' +
+      '</button>' +
+    '</div>';
+
+  var holidayBadge = holiday
+    ? '<span class="holiday-badge">' + (dow === 0 || dow === 6 ? '週末' : '祝日') + '</span>'
+    : '';
+
+  return (
+    '<div class="page-home">' +
+      '<div class="home-header">' +
+        '<div class="home-header-row">' +
+          '<div>' +
+            '<div class="home-date">' + dateLabel + holidayBadge + '</div>' +
+            '<div class="home-sub">自動割り当て済みのタスク</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="section-card">' +
+        '<div class="section-header">' +
+          '<span class="section-title">今日のタスク</span>' +
+          loadBar +
+        '</div>' +
+        '<div id="today-task-list">' + taskHtml + '</div>' +
+        rebalanceBtn +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function renderTodayTask(t, todayStr) {
+  var isWeekly = t.type === 'weekly';
+  var srcIcon = '';
+  if      (t._src === 'overdue')  srcIcon = '<span class="src-tag overdue">期限超過</span>';
+  else if (t._src === 'today_dl') srcIcon = '<span class="src-tag today-dl">本日期限</span>';
+  else if (t._src === 'urgent')   srcIcon = '<span class="src-tag urgent">明日期限</span>';
+  else if (t._src === 'weekly')   srcIcon = '<span class="src-tag weekly">週次</span>';
+
+  var toggleFn = isWeekly
+    ? 'toggleWeeklyTodayDone(\'' + t.id + '\')'
+    : 'toggleOnceTodayDone(\'' + t.id + '\')';
+
+  var dispLoad = t._snapLoad || t.load || 1;
+
+  return (
+    '<div class="today-task">' +
+      '<button class="task-check" onclick="' + toggleFn + '"></button>' +
+      '<div class="task-body">' +
+        '<div class="task-top-row">' +
+          '<span class="task-title">' + sanitize(t.title) + '</span>' +
+          srcIcon +
+        '</div>' +
+        '<div class="task-meta">' +
+          loadBadge(dispLoad) +
+          (t.deadline ? deadlineChip(t.deadline) : '') +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function toggleOnceTodayDone(id) {
+  toggleOnceDone(id);
+  navigateTo('home');
+}
+
+function toggleWeeklyTodayDone(id) {
+  var todayStr = today();
+  var t = S.tasks.find(function(t) { return t.id === id; });
+  if (!t) return;
+  if (isWeeklyDoneOn(t, todayStr)) unmarkWeeklyDoneToday(id);
+  else markWeeklyDoneToday(id);
+  navigateTo('home');
+}
+
+/**
+ * 完了済みを保持したまま未完了タスクだけ組み直す。
+ * キャパ変更・割り当てがおかしいときの緊急修正用。
+ */
+function doRebalance() {
+  rebalanceSnapshot();
+  navigateTo('home');
+  showToast('未完了タスクを組み直しました');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+function init() {
+  loadState();
+  if (S.settings.bg) applyBackground(S.settings.bg, S.settings.bgOpacity);
+  navigateTo('home');
+
+  document.querySelectorAll('.modal-overlay').forEach(function(o) {
+    o.addEventListener('click', function(e) {
+      if (e.target === o) closeModal(o.id);
+    });
+  });
+
+  window.addEventListener('offline', function() { document.getElementById('offline-badge').style.display = 'block'; });
+  window.addEventListener('online',  function() { document.getElementById('offline-badge').style.display = 'none'; });
+  if (!navigator.onLine) document.getElementById('offline-badge').style.display = 'block';
+}
+
+
+// === app-tasks.js ===
+// app-tasks.js — Altair v2.1
+// 依存: config.js, store.js, app-common.js, app-core.js
+// 責務: タスク管理（一覧・追加・編集・削除）
+
+var _editingTaskId = null;
+var _taskFilter    = 'active';
+var _deletingTaskId = null;  // 削除確認モーダル用
+
+// ============================================================
+// タスク一覧ページ
+// ============================================================
+
+function renderTasksPage() {
+  var allOnce = S.tasks.filter(function(t) { return t.type !== 'weekly'; });
+  var active  = allOnce.filter(function(t) { return !t.done; });
+  var done    = allOnce.filter(function(t) { return t.done; });
+  var weekly  = S.tasks.filter(function(t) { return t.type === 'weekly'; });
+
+  var aC = active.length > 0 ? ' <span class="tab-count">' + active.length + '</span>' : '';
+  var wC = weekly.length > 0 ? ' <span class="tab-count">' + weekly.length + '</span>' : '';
+
+  var tabHtml =
+    '<button class="sub-tab ' + (_taskFilter === 'active' ? 'active' : '') + '" onclick="setTaskFilter(\'active\')">未完了' + aC + '</button>' +
+    '<button class="sub-tab ' + (_taskFilter === 'done'   ? 'active' : '') + '" onclick="setTaskFilter(\'done\')">完了済み</button>' +
+    '<button class="sub-tab ' + (_taskFilter === 'weekly' ? 'active' : '') + '" onclick="setTaskFilter(\'weekly\')">週次' + wC + '</button>';
+
+  var listHtml = '';
+  if (_taskFilter === 'active') {
+    if (active.length === 0) {
+      listHtml = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">タスクがありません</div><div class="empty-sub">右下の＋ボタンで追加</div></div>';
+    } else {
+      // 期限あり優先・同じ期限なら負荷降順
+      var sorted = active.slice().sort(function(a, b) {
+        if (a.deadline && !b.deadline) return -1;
+        if (!a.deadline && b.deadline) return 1;
+        if (a.deadline && b.deadline) {
+          var dc = a.deadline.localeCompare(b.deadline);
+          if (dc !== 0) return dc;
+        }
+        return (b.load || 1) - (a.load || 1);
+      });
+      listHtml = sorted.map(function(t) { return renderTaskItem(t); }).join('');
+    }
+  } else if (_taskFilter === 'done') {
+    if (done.length === 0) {
+      listHtml = '<div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-title">完了済みタスクはありません</div></div>';
+    } else {
+      var sorted2 = done.slice().sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      listHtml = sorted2.map(function(t) { return renderTaskItem(t); }).join('');
+    }
+  } else {
+    if (weekly.length === 0) {
+      listHtml = '<div class="empty-state"><div class="empty-icon">🔁</div><div class="empty-title">週次タスクがありません</div><div class="empty-sub">右下の＋ボタンで追加</div></div>';
+    } else {
+      listHtml = weekly.map(function(t) { return renderTaskItem(t); }).join('');
+    }
+  }
+
+  return '<div class="page-tasks">' +
+    '<div class="page-title">タスク</div>' +
+    '<div class="sub-tabs">' + tabHtml + '</div>' +
+    '<div class="task-list">' + listHtml + '</div>' +
+    '</div>' +
+    '<button class="fab" onclick="openAddTask()">' +
+    '<svg viewBox="0 0 24 24" fill="none">' +
+    '<line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>' +
+    '<line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>' +
+    '</svg></button>';
+}
+
+function renderTaskItem(t) {
+  var isWeekly = t.type === 'weekly';
+  var isDone   = isWeekly ? false : t.done;
+  var cls      = isDone ? 'task-list-item done' : 'task-list-item';
+
+  var weekdayStr = '';
+  if (isWeekly && Array.isArray(t.weekDays) && t.weekDays.length > 0) {
+    weekdayStr = t.weekDays.slice().sort().map(function(d) { return CFG.WEEKDAY_NAMES[d]; }).join('・');
+  }
+
+  var checkHtml = '';
+  if (!isWeekly) {
+    var sv = isDone
+      ? '<svg viewBox="0 0 24 24" fill="none"><polyline points="20,6 9,17 4,12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '';
+    checkHtml = '<button class="task-check ' + (isDone ? 'checked' : '') + '" onclick="toggleTaskDoneFromList(\'' + t.id + '\')">' + sv + '</button>';
+  } else {
+    checkHtml = '<div class="task-check weekly-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 20V12m0 0l-3 3m3-3l3 3M4 4h16v4H4z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>';
+  }
+
+  var todayDoneTag = (isWeekly && isWeeklyDoneOn(t, today()))
+    ? '<span class="src-tag weekly">本日完了</span>'
+    : '';
+
+  return '<div class="' + cls + '">' +
+    '<div class="task-list-main">' +
+    checkHtml +
+    '<div class="task-body">' +
+    '<span class="task-title">' + sanitize(t.title) + '</span>' +
+    '<div class="task-meta">' +
+    loadBadge(t.load) +
+    (t.deadline ? deadlineChip(t.deadline) : '') +
+    (weekdayStr ? '<span class="weekday-str">' + weekdayStr + '</span>' : '') +
+    todayDoneTag +
+    '</div></div></div>' +
+    '<div class="task-list-actions">' +
+    '<button class="icon-btn" onclick="openEditTask(\'' + t.id + '\')">' +
+    '<svg viewBox="0 0 24 24" fill="none"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+    '</button>' +
+    '<button class="icon-btn danger" onclick="openDeleteConfirm(\'' + t.id + '\')">' +
+    '<svg viewBox="0 0 24 24" fill="none"><polyline points="3,6 5,6 21,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+    '</button>' +
+    '</div></div>';
+}
+
+function setTaskFilter(key) {
+  _taskFilter = key;
+  navigateTo('tasks');
+}
+
+// ============================================================
+// タスク追加・編集モーダル
+// ============================================================
+
+function openAddTask() {
+  _editingTaskId = null;
+  resetTaskModal();
+  document.getElementById('modal-task-title').textContent = 'タスクを追加';
+  setTaskType('once');
+  openModal('modal-task');
+}
+
+function openEditTask(id) {
+  var t = S.tasks.find(function(t) { return t.id === id; });
+  if (!t) return;
+  _editingTaskId = id;
+  resetTaskModal();
+  document.getElementById('modal-task-title').textContent = 'タスクを編集';
+  document.getElementById('input-task-title').value = t.title || '';
+  setTaskType(t.type || 'once');
+  if (t.type === 'weekly') {
+    var wd = t.weekDays || [];
+    document.querySelectorAll('.wd-btn').forEach(function(btn) {
+      btn.classList.toggle('active', wd.includes(+btn.dataset.dow));
+    });
+  } else {
+    document.getElementById('input-task-deadline').value = t.deadline || '';
+  }
+  document.querySelectorAll('.load-radio').forEach(function(el) {
+    el.classList.toggle('active', +el.dataset.load === t.load);
+  });
+  openModal('modal-task');
+}
+
+function resetTaskModal() {
+  document.getElementById('input-task-title').value    = '';
+  document.getElementById('input-task-deadline').value = '';
+  // デフォルト負荷: 3（普通）
+  document.querySelectorAll('.load-radio').forEach(function(el, i) {
+    el.classList.toggle('active', i === 2);
+  });
+  document.querySelectorAll('.wd-btn').forEach(function(b) { b.classList.remove('active'); });
+}
+
+function setTaskType(type) {
+  var isW = type === 'weekly';
+  document.querySelectorAll('.type-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.type === type);
+  });
+  document.getElementById('deadline-row').style.display  = isW ? 'none' : '';
+  document.getElementById('weekdays-row').style.display  = isW ? '' : 'none';
+}
+
+function setLoadValue(el) {
+  document.querySelectorAll('.load-radio').forEach(function(b) { b.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+function saveTask() {
+  var title    = document.getElementById('input-task-title').value.trim();
+  var deadline = document.getElementById('input-task-deadline').value;
+  var loadEl   = document.querySelector('.load-radio.active');
+  var load     = loadEl ? +loadEl.dataset.load : 3;
+  var typeEl   = document.querySelector('.type-btn.active');
+  var type     = typeEl ? typeEl.dataset.type : 'once';
+  var weekDays = type === 'weekly' ? getSelectedWeekdays() : [];
+
+  if (!title) { showToast('タイトルを入力してください'); return; }
+  if (type === 'weekly' && weekDays.length === 0) { showToast('繰り返す曜日を選択してください'); return; }
+
+  if (_editingTaskId) {
+    var t = S.tasks.find(function(t) { return t.id === _editingTaskId; });
+    if (!t) return;
+    t.title = sanitize(title);
+    t.load  = load;
+    t.type  = type;
+    if (type === 'weekly') {
+      t.weekDays = weekDays; t.deadline = null;
+      if (!Array.isArray(t.doneHistory)) t.doneHistory = [];
+    } else {
+      t.deadline = deadline || null; t.weekDays = [];
+    }
+    resetTodayPlan(); // 編集時はスナップショットをリセット
+  } else {
+    var task = {
+      id: generateId(), title: sanitize(title),
+      load: load, type: type, createdAt: Date.now(),
+    };
+    if (type === 'weekly') {
+      task.weekDays = weekDays; task.doneHistory = []; task.deadline = null;
+    } else {
+      task.deadline = deadline || null; task.weekDays = []; task.done = false;
+    }
+    S.tasks.push(task);
+    resetTodayPlan(); // 追加時もスナップショットをリセット
+  }
+
+  saveState();
+  closeModal('modal-task');
+  showToast(_editingTaskId ? '更新しました' : 'タスクを追加しました');
+  navigateTo('tasks');
+}
+
+// ============================================================
+// タスク削除（window.confirm の代わりにカスタムモーダルを使用）
+// ============================================================
+
+/** 削除確認モーダルを開く */
+function openDeleteConfirm(id) {
+  _deletingTaskId = id;
+  openModal('modal-delete-confirm');
+}
+
+/** モーダルの「削除する」ボタンから呼ばれる */
+function executeDeleteTask() {
+  closeModal('modal-delete-confirm');
+  if (!_deletingTaskId) return;
+  removeFromSnapshot(_deletingTaskId);
+  S.tasks = S.tasks.filter(function(t) { return t.id !== _deletingTaskId; });
+  _deletingTaskId = null;
+  saveState();
+  showToast('削除しました');
+  navigateTo('tasks');
+}
+
+function toggleTaskDoneFromList(id) {
+  toggleOnceDone(id);
+  navigateTo('tasks');
+}
+
+
+// === app-settings.js ===
+// app-settings.js — Altair v2.3
+// 依存: config.js, store.js, app-common.js, app-core.js
+// 責務: 設定ページ・壁紙
+// ★ 末尾で init() を呼ぶ（このファイルだけ）
+
+function renderSettings() {
+  var capW      = S.settings.capacityWeekday || CFG.DEFAULT_DAILY_CAPACITY;
+  var capH      = S.settings.capacityHoliday || 6;
+  var bgOpacity = S.settings.bgOpacity !== undefined ? S.settings.bgOpacity : 65;
+  var hasBg     = !!S.settings.bg;
+  var holidays  = S.settings.holidays || [];
+
+  var oncePending  = S.tasks.filter(function(t) { return t.type !== 'weekly' && !t.done; }).length;
+  var weeklyCount  = S.tasks.filter(function(t) { return t.type === 'weekly'; }).length;
+  var overdueTasks = S.tasks.filter(function(t) {
+    return t.type !== 'weekly' && !t.done && t.deadline && t.deadline < today();
+  }).length;
+
+  var holidayListHtml = holidays.length === 0
+    ? '<div class="holiday-empty">登録された祝日はありません</div>'
+    : holidays.slice().sort().map(function(d) {
+        var dd    = new Date(d + 'T00:00:00');
+        var label = dd.getFullYear() + '/' + pad2(dd.getMonth() + 1) + '/' + pad2(dd.getDate())
+          + '（' + CFG.WEEKDAY_NAMES[dd.getDay()] + '）';
+        return '<div class="holiday-item">' +
+          '<span class="holiday-date">' + label + '</span>' +
+          '<button class="icon-btn danger" onclick="removeHoliday(\'' + d + '\')">' +
+            '<svg viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+          '</button>' +
+        '</div>';
+      }).join('');
+
+  return '<div class="page-settings">' +
+    '<div class="page-title">設定</div>' +
+
+    // ── サマリー ──
+    '<div class="section-card">' +
+    '<div class="section-title">タスクサマリー</div>' +
+    '<div class="summary-grid">' +
+    '<div class="summary-item"><span class="summary-num">' + oncePending + '</span><span class="summary-label">未完了</span></div>' +
+    '<div class="summary-item"><span class="summary-num" style="' + (overdueTasks > 0 ? 'color:var(--bad)' : '') + '">' + overdueTasks + '</span><span class="summary-label">期限超過</span></div>' +
+    '<div class="summary-item"><span class="summary-num">' + weeklyCount + '</span><span class="summary-label">週次</span></div>' +
+    '</div>' +
+    '</div>' +
+
+    // ── キャパシティ（平日）──
+    '<div class="section-card">' +
+    '<div class="section-title">1日の負荷キャパシティ — 平日</div>' +
+    '<p class="section-desc">月〜金（祝日を除く）のキャパシティです。保存すると今日の未完了タスクが組み直されます（完了済みはそのまま）。</p>' +
+    '<div class="capacity-control">' +
+    '<input type="range" id="capacity-slider-weekday" min="2" max="30" value="' + capW + '" ' +
+      'oninput="document.getElementById(\'capacity-value-weekday\').textContent=this.value">' +
+    '<span id="capacity-value-weekday">' + capW + '</span>' +
+    '<button class="btn btn-sm btn-primary" onclick="saveCapacityWeekday()">保存</button>' +
+    '</div>' +
+    _loadGuideHtml() +
+    '</div>' +
+
+    // ── キャパシティ（休日）──
+    '<div class="section-card">' +
+    '<div class="section-title">1日の負荷キャパシティ — 休日・祝日</div>' +
+    '<p class="section-desc">土日・登録した祝日のキャパシティです。</p>' +
+    '<div class="capacity-control">' +
+    '<input type="range" id="capacity-slider-holiday" min="0" max="30" value="' + capH + '" ' +
+      'oninput="document.getElementById(\'capacity-value-holiday\').textContent=this.value">' +
+    '<span id="capacity-value-holiday">' + capH + '</span>' +
+    '<button class="btn btn-sm btn-primary" onclick="saveCapacityHoliday()">保存</button>' +
+    '</div>' +
+    '</div>' +
+
+    // ── 祝日管理 ──
+    '<div class="section-card">' +
+    '<div class="section-title">祝日・特別休日の登録</div>' +
+    '<p class="section-desc">土日以外で休日扱いにしたい日（年末年始・振替休日など）を登録します。</p>' +
+    '<div class="holiday-add-row">' +
+    '<input type="date" id="holiday-date-input" style="flex:1">' +
+    '<button class="btn btn-sm btn-primary" onclick="addHoliday()">追加</button>' +
+    '</div>' +
+    '<div class="holiday-list">' + holidayListHtml + '</div>' +
+    '</div>' +
+
+    // ── 壁紙 ──
+    '<div class="section-card">' +
+    '<div class="section-title">壁紙</div>' +
+    '<p class="section-desc">背景に画像を設定できます。JPG・PNG・WebP対応（5MB以下）。</p>' +
+    '<div class="bg-preview-wrap">' +
+    (hasBg
+      ? '<div class="bg-preview" style="background-image:url(\'' + S.settings.bg + '\')"></div>'
+      : '<div class="bg-preview empty">壁紙なし</div>') +
+    '</div>' +
+    '<div class="bg-actions">' +
+    '<button class="btn btn-secondary" onclick="document.getElementById(\'bg-file-input\').click()">📷 画像を選択</button>' +
+    (hasBg ? '<button class="btn btn-danger" onclick="removeBg()">🗑 削除</button>' : '') +
+    '</div>' +
+    '<input type="file" id="bg-file-input" accept="image/*" style="display:none" onchange="onBgFileChange(event)">' +
+    (hasBg
+      ? '<div class="form-group" style="margin-top:14px">' +
+        '<label>オーバーレイ濃度（暗さ）</label>' +
+        '<div class="capacity-control">' +
+        '<input type="range" id="opacity-slider" min="0" max="95" value="' + bgOpacity + '" ' +
+          'oninput="document.getElementById(\'opacity-value\').textContent=this.value+\'%\';previewOpacity(this.value)">' +
+        '<span id="opacity-value">' + bgOpacity + '%</span>' +
+        '<button class="btn btn-sm btn-primary" onclick="saveBgOpacity()">保存</button>' +
+        '</div></div>'
+      : '') +
+    '</div>' +
+
+    // ── データ管理 ──
+    '<div class="section-card">' +
+    '<div class="section-title">データ管理</div>' +
+    '<div class="settings-actions">' +
+    '<button class="btn btn-secondary btn-full" onclick="exportData()">📤 データをエクスポート</button>' +
+    '<button class="btn btn-secondary btn-full" onclick="document.getElementById(\'import-input\').click()">📥 データをインポート</button>' +
+    '<input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">' +
+    '<button class="btn btn-danger btn-full" onclick="openResetConfirm()">🗑 全データをリセット</button>' +
+    '</div>' +
+    '</div>' +
+
+    '<div class="version-info">Altair v' + CFG.APP_VERSION + '</div>' +
+    '</div>';
+}
+
+function _loadGuideHtml() {
+  return '<div class="load-guide">' +
+    '<div class="load-guide-title">負荷値の目安</div>' +
+    [1, 2, 3, 4, 5].map(function(l) {
+      var c    = CFG.LOAD_COLORS[l];
+      var desc = ['〜30分', '〜1時間', '〜1.5時間', '〜2時間', '2時間超'][l - 1];
+      return '<div class="load-guide-row">' +
+        '<span class="load-badge" style="background:' + c + '20;color:' + c + ';border-color:' + c + '40">' + CFG.LOAD_LABELS[l] + '</span>' +
+        '<span class="load-guide-desc">' + desc + '</span></div>';
+    }).join('') +
+    '</div>';
+}
+
+// ============================================================
+// CAPACITY
+// キャパ変更時は rebalanceSnapshot（完了保持・未完了組み直し）を呼ぶ
+// ============================================================
+
+function saveCapacityWeekday() {
+  var val = +document.getElementById('capacity-slider-weekday').value;
+  if (val >= 2 && val <= 30) {
+    S.settings.capacityWeekday = val;
+    saveState();
+    rebalanceSnapshot();  // 完了を保持して未完了だけ組み直す
+    showToast('平日キャパシティを ' + val + ' に設定しました');
+    navigateTo('settings');
+  }
+}
+
+function saveCapacityHoliday() {
+  var val = +document.getElementById('capacity-slider-holiday').value;
+  if (val >= 0 && val <= 30) {
+    S.settings.capacityHoliday = val;
+    saveState();
+    rebalanceSnapshot();
+    showToast('休日キャパシティを ' + val + ' に設定しました');
+    navigateTo('settings');
+  }
+}
+
+// ============================================================
+// HOLIDAYS
+// ============================================================
+
+function addHoliday() {
+  var input = document.getElementById('holiday-date-input');
+  var val   = input ? input.value : '';
+  if (!val) { showToast('日付を選択してください'); return; }
+  if (!Array.isArray(S.settings.holidays)) S.settings.holidays = [];
+  if (S.settings.holidays.includes(val)) { showToast('すでに登録されています'); return; }
+  S.settings.holidays.push(val);
+  rebalanceSnapshot();
+  saveState();
+  showToast('祝日を追加しました');
+  navigateTo('settings');
+}
+
+function removeHoliday(dateStr) {
+  if (!Array.isArray(S.settings.holidays)) return;
+  S.settings.holidays = S.settings.holidays.filter(function(d) { return d !== dateStr; });
+  rebalanceSnapshot();
+  saveState();
+  showToast('祝日を削除しました');
+  navigateTo('settings');
+}
+
+// ============================================================
+// WALLPAPER
+// ============================================================
+
+function onBgFileChange(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { showToast('ファイルが大きすぎます（5MB以下）'); return; }
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    S.settings.bg = ev.target.result;
+    saveState();
+    applyBackground(S.settings.bg, S.settings.bgOpacity);
+    showToast('壁紙を設定しました');
+    navigateTo('settings');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeBg() {
+  S.settings.bg = '';
+  saveState();
+  applyBackground('', 0);
+  showToast('壁紙を削除しました');
+  navigateTo('settings');
+}
+
+function previewOpacity(val) { applyBackground(S.settings.bg, +val); }
+
+function saveBgOpacity() {
+  var val = +document.getElementById('opacity-slider').value;
+  S.settings.bgOpacity = val;
+  saveState();
+  applyBackground(S.settings.bg, val);
+  showToast('濃度を保存しました');
+}
+
+function openResetConfirm() { openModal('modal-confirm'); }
+
+// ============================================================
+// 起動
+// ============================================================
+init();
+
+
+</script>
+<script src="./store.js"></script>
+<script src="./app-common.js"></script>
+<script src="./app-core.js"></script>
+<script src="./app-tasks.js"></script>
+<script src="./app-settings.js"></script>
+</body>
+</html>
